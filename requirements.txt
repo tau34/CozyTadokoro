@@ -1,0 +1,4 @@
+discord.py
+sympy
+matplotlib
+flask
