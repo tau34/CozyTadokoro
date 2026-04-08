@@ -45,5 +45,9 @@ async def tex(ctx, *, formula):
     except Exception as e:
         await ctx.send(f"Error: {e}")
 
+token = os.environ.get("TOKEN")
+print("TOKEN:", token)
+print("LENGTH:", len(token) if token else "None")
+
 keep_alive()
 bot.run(os.environ["TOKEN"])
