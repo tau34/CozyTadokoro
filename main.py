@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 import matplotlib.pyplot as plt
 from flask import Flask
@@ -7,6 +8,13 @@ import os
 import re
 
 app = Flask('')
+
+# ===== Discord bot =====
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix="!", intents=intents)
+client = discord.Client(intents=intents)
+tree = app_commands.CommandTree(client)
 
 @app.route('/')
 def home():
@@ -21,11 +29,11 @@ def keep_alive():
 
     import matplotlib.pyplot as plt
 
-def render_formula(latex):
+def render_formula(latex, textColor, bgColor):
     plt.rcParams["mathtext.fontset"] = "stix"
     plt.rcParams["font.family"] = "STIXGeneral"
 
-    fig = plt.figure(figsize=(4, 2))
+    fig = plt.figure(figsize=(4, 2), facecolor=bgColor if bgColor != "transparent" else None)
     ax = fig.add_subplot(111)
 
     ax.axis('off')
@@ -33,7 +41,7 @@ def render_formula(latex):
     fontsize = 50  # まずは大きく
     text = ax.text(0.5, 0.5, f"${latex}$",
         ha='center', va='center',
-        fontsize=fontsize)
+        fontsize=fontsize, color=textColor)
 
     fig.canvas.draw()
 
@@ -47,7 +55,7 @@ def render_formula(latex):
         fig.canvas.draw()
         bbox = text.get_window_extent(renderer=renderer)
 
-    plt.savefig("formula.png", bbox_inches='tight', dpi=300, transparent=True)
+    plt.savefig("formula.png", bbox_inches='tight', dpi=300, transparent=(bgColor == "transparent"))
     plt.close()
 
 def latex_to_text(latex: str) -> str:
@@ -105,27 +113,23 @@ def latex_to_text(latex: str) -> str:
 
     return latex
 
-# ===== Discord bot =====
-intents = discord.Intents.default()
-intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-@bot.event
+@client.event
 async def on_ready():
-    print(f"Logged in as {bot.user}")
+    print(f"Logged in as {client.user}")
+    await tree.sync()
 
-@bot.command()
-async def tex(ctx, *, formula):
+@tree.command(name="tex", description="数式を画像で表示")
+async def tex(ctx, formula: str, textColor: str = "black", bgColor: str = "white"):
     try:
-        render_formula(formula)
+        render_formula(formula, textColor=textColor, bgColor=bgColor)
 
         await ctx.send(file=discord.File("formula.png"))
 
     except Exception as e:
         await ctx.send(f"Error: {e}")
 
-@bot.command()
-async def tex_text(ctx, *, formula):
+@tree.command(name="tex-text", description="数式をテキスト表示")
+async def tex_text(ctx, formula: str):
     try:
         await ctx.send(latex_to_text(formula))
 
@@ -133,4 +137,4 @@ async def tex_text(ctx, *, formula):
         await ctx.send(f"Error: {e}")
 
 keep_alive()
-bot.run(os.environ["TOKEN"])
+client.run(os.environ["TOKEN"])
