@@ -136,10 +136,10 @@ async def tex_text(interaction: discord.Interaction, formula: str):
     await interaction.response.defer()
 
     try:
-        await interaction.response.send_message(latex_to_text(formula))
+        await interaction.followup.send_message(latex_to_text(formula))
 
     except Exception as e:
-        await interaction.response.send_message(f"Error: {e}")
+        await interaction.followup.send_message(f"Error: {e}")
 
 keep_alive()
 client.run(os.environ["TOKEN"])
