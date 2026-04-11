@@ -20,6 +20,11 @@ tree = app_commands.CommandTree(client)
 def home():
     return "I'm alive"
 
+@client.event
+async def on_ready():
+    print(f"Logged in as {client.user}")
+    await tree.sync()
+
 def run():
     app.run(host='0.0.0.0', port=10000)
 
@@ -113,15 +118,10 @@ def latex_to_text(latex: str) -> str:
 
     return latex
 
-@client.event
-async def on_ready():
-    print(f"Logged in as {client.user}")
-    await tree.sync()
-
 @tree.command(name="tex", description="数式を画像で表示")
-async def tex(ctx, formula: str, textColor: str = "black", bgColor: str = "white"):
+async def tex(ctx, formula: str, text_color: str = "black", bg_color: str = "white"):
     try:
-        render_formula(formula, textColor=textColor, bgColor=bgColor)
+        render_formula(formula, textColor=text_color, bgColor=bg_color)
 
         await ctx.send(file=discord.File("formula.png"))
 
