@@ -134,10 +134,10 @@ async def tex(interaction: discord.Interaction,
 @tree.command(name="tex-text", description="数式をテキスト表示")
 async def tex_text(interaction: discord.Interaction, formula: str):
     try:
-        await interaction.respond(latex_to_text(formula))
+        await interaction.response.send_message(latex_to_text(formula))
 
     except Exception as e:
-        await interaction.respond(f"Error: {e}")
+        await interaction.response.send_message(f"Error: {e}")
 
 keep_alive()
 client.run(os.environ["TOKEN"])
