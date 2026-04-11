@@ -119,22 +119,27 @@ def latex_to_text(latex: str) -> str:
     return latex
 
 @tree.command(name="tex", description="数式を画像で表示")
-async def tex(ctx, formula: str, text_color: str = "black", bg_color: str = "white"):
+async def tex(interaction: discord.Interaction,
+                formula: str, text_color: str = "black", bg_color: str = "white"):
+    await interaction.response.defer()
+
     try:
         render_formula(formula, textColor=text_color, bgColor=bg_color)
 
-        await ctx.send(file=discord.File("formula.png"))
+        await interaction.followup.send(file=discord.File("formula.png"))
 
     except Exception as e:
-        await ctx.send(f"Error: {e}")
+        await interaction.followup.send(f"Error: {e}")
 
 @tree.command(name="tex-text", description="数式をテキスト表示")
-async def tex_text(ctx, formula: str):
+async def tex_text(interaction: discord.Interaction, formula: str):
+    await interaction.response.defer()
+
     try:
-        await ctx.send(latex_to_text(formula))
+        await interaction.response.send_message(latex_to_text(formula))
 
     except Exception as e:
-        await ctx.send(f"Error: {e}")
+        await interaction.response.send_message(f"Error: {e}")
 
 keep_alive()
 client.run(os.environ["TOKEN"])
