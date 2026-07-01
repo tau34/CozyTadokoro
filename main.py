@@ -44,6 +44,11 @@ def render_formula(latex, textColor, bgColor):
     ax.axis('off')
 
     fontsize = 50  # まずは大きく
+
+    length = len(latex)
+    if (length > 300):
+        fontsize = 4
+
     text = ax.text(0.5, 0.5, f"${latex}$",
         ha='center', va='center',
         fontsize=fontsize, color=textColor)
@@ -60,7 +65,20 @@ def render_formula(latex, textColor, bgColor):
         fig.canvas.draw()
         bbox = text.get_window_extent(renderer=renderer)
 
-    plt.savefig("formula.png", bbox_inches='tight', dpi=300, transparent=(bgColor == "transparent"))
+    dpi = 300
+    if length > 500:
+        dpi = 10
+    elif length > 200:
+        dpi = 30
+    elif length > 100:
+        dpi = 50
+    elif length > 50:
+        dpi = 100
+    elif length > 30:
+        dpi = 150
+
+    plt.savefig("formula.png", bbox_inches='tight', dpi=dpi, transparent=(bgColor == "transparent"))
+    plt.show()
     plt.close()
 
 def latex_to_text(latex: str) -> str:
