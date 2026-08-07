@@ -1,3 +1,4 @@
 discord.py
 matplotlib
 flask
+mecab-python3
