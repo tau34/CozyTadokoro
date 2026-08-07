@@ -246,6 +246,8 @@ async def tex_text(interaction: discord.Interaction, formula: str):
 
 @tree.command(name="analyze", description="日本語の文章を品詞分解")
 async def analyze(interaction: discord.Interaction, text: str):
+    await interaction.response.defer()
+
     status, payload = run_with_timeout(
         analyze_text, (text, interaction.response), 10)
 
