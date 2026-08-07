@@ -256,10 +256,6 @@ async def analyze(interaction: discord.Interaction, text: str):
     if status == "error":
         await interaction.followup.send(f"Error: {payload}")
 
-if __name__ == "__main__":
-    keep_alive()
-    client.run(os.environ["TOKEN"])
-
 @tree.command(name="donate-info", description="寄付の情報を表示")
 async def donate_info(interaction: discord.Interaction):
     await interaction.response.send_message(
@@ -268,3 +264,7 @@ async def donate_info(interaction: discord.Interaction):
         "寄付は以下のリンクから行うことができます。\n"
         "https://www.patreon.com/c/tau34\n"
     )
+
+if __name__ == "__main__":
+    keep_alive()
+    client.run(os.environ["TOKEN"])
