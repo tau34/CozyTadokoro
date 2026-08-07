@@ -1,11 +1,18 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+import multiprocessing
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from flask import Flask
 from threading import Thread
 import os
 import re
+import MeCab
+import unicodedata
+
+mecab = MeCab.Tagger()
 
 app = Flask('')
 
@@ -15,6 +22,8 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
+
+TIMEOUT_MSG = "処理時間の制限を超えました…\nアップグレードするには、https://www.patreon.com/c/tau34 で寄付してください！\n詳細はコマンド```/donate-infoで確認できます。```"
 
 @app.route('/')
 def home():
@@ -32,8 +41,6 @@ def keep_alive():
     t = Thread(target=run)
     t.start()
 
-    import matplotlib.pyplot as plt
-
 def render_formula(latex, textColor, bgColor):
     plt.rcParams["mathtext.fontset"] = "stix"
     plt.rcParams["font.family"] = "STIXGeneral"
@@ -44,6 +51,11 @@ def render_formula(latex, textColor, bgColor):
     ax.axis('off')
 
     fontsize = 50  # まずは大きく
+
+    length = len(latex)
+    if (length > 300):
+        fontsize = 4
+
     text = ax.text(0.5, 0.5, f"${latex}$",
         ha='center', va='center',
         fontsize=fontsize, color=textColor)
@@ -60,7 +72,19 @@ def render_formula(latex, textColor, bgColor):
         fig.canvas.draw()
         bbox = text.get_window_extent(renderer=renderer)
 
-    plt.savefig("formula.png", bbox_inches='tight', dpi=300, transparent=(bgColor == "transparent"))
+    dpi = 300
+    if length > 500:
+        dpi = 10
+    elif length > 200:
+        dpi = 30
+    elif length > 100:
+        dpi = 50
+    elif length > 50:
+        dpi = 100
+    elif length > 30:
+        dpi = 150
+
+    fig.savefig("formula.png", bbox_inches='tight', dpi=dpi, transparent=(bgColor == "transparent"))
     plt.close()
 
 def latex_to_text(latex: str) -> str:
@@ -118,18 +142,111 @@ def latex_to_text(latex: str) -> str:
 
     return latex
 
+
+def is_emoji_or_symbol(text):
+    for ch in text:
+        category = unicodedata.category(ch)
+
+        if category in ("So", "Sk"):
+            return True
+
+    return False
+
+def should_keep(surface, features):
+    pos = features[0]
+
+    if pos == "補助記号":
+        return True
+
+    if pos == "未知語":
+        return True
+
+    if is_emoji_or_symbol(surface):
+        return True
+
+    return False
+
+def replace_with_pos(text):
+    result = []
+
+    node = mecab.parseToNode(text)
+
+    while node:
+        surface = node.surface
+        feature = node.feature
+
+        if not surface:
+            node = node.next
+            continue
+
+        features = feature.split(",")
+
+        if should_keep(surface, features):
+            result.append(surface)
+        elif features[0] == "代名詞":
+            result.append("名詞")
+        else:
+            result.append(features[0])
+
+        node = node.next
+
+    return "".join(result)
+
+def analyze_text(text, response):
+    str = text.split(" ")
+    for i in range(len(str)):
+        s = str[i]
+        s1 = s.split("　")
+        s1 = [replace_with_pos(x) for x in s1]
+        str[i] = "　".join(s1)
+
+    response.send_message(" ".join(str).replace("形状詞助動詞", "形容動詞"))
+
+
+def _render_formula_worker(formula, text_color, bg_color, result_queue):
+    try:
+        render_formula(formula, textColor=text_color, bgColor=bg_color)
+        result_queue.put(("ok", None))
+    except Exception as exc:
+        result_queue.put(("error", str(exc)))
+
+
+def run_with_timeout(target, args, timeout_seconds):
+    result_queue = multiprocessing.Queue()
+    process = multiprocessing.Process(target=target, args=(*args, result_queue))
+
+    process.start()
+    process.join(timeout_seconds)
+
+    if process.is_alive():
+        process.terminate()
+        process.join()
+        return ("timeout", None)
+
+    try:
+        return result_queue.get(timeout=1)
+    except Exception:
+        return ("error", "結果を取得できませんでした")
+
 @tree.command(name="tex", description="数式を画像で表示")
 async def tex(interaction: discord.Interaction,
                 formula: str, text_color: str = "black", bg_color: str = "white"):
     await interaction.response.defer()
 
-    try:
-        render_formula(formula, textColor=text_color, bgColor=bg_color)
+    status, payload = run_with_timeout(
+        _render_formula_worker,
+        (formula, text_color, bg_color),
+        10,
+    )
 
+    if status == "timeout":
+        await interaction.followup.send(TIMEOUT_MSG)
+        return
+
+    if status == "ok":
         await interaction.followup.send(file=discord.File("formula.png"))
-
-    except Exception as e:
-        await interaction.followup.send(f"Error: {e}")
+    else:
+        await interaction.followup.send(f"Error: {payload}")
 
 @tree.command(name="tex-text", description="数式をテキスト表示")
 async def tex_text(interaction: discord.Interaction, formula: str):
@@ -139,5 +256,27 @@ async def tex_text(interaction: discord.Interaction, formula: str):
     except Exception as e:
         await interaction.response.send_message(f"Error: {e}")
 
-keep_alive()
-client.run(os.environ["TOKEN"])
+@tree.command(name="analyze", description="日本語の文章を品詞分解")
+async def analyze(interaction: discord.Interaction, text: str):
+    status, payload = run_with_timeout(
+        analyze_text, (text, interaction.response), 10)
+
+    if status == "timeout":
+        await interaction.followup.send(TIMEOUT_MSG)
+        return
+
+    if status == "error":
+        await interaction.followup.send(f"Error: {payload}")
+
+if __name__ == "__main__":
+    keep_alive()
+    client.run(os.environ["TOKEN"])
+
+@tree.command(name="donate-info", description="寄付の情報を表示")
+async def donate_info(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        "このBotは、寄付によって運営されています。\n"
+        "寄付額が一定の金額を超えると、より多くの機能やサポートを提供することができます。\n"
+        "寄付は以下のリンクから行うことができます。\n"
+        "https://www.patreon.com/c/tau34\n"
+    )
