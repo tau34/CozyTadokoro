@@ -72,19 +72,7 @@ def render_formula(latex, textColor, bgColor):
         fig.canvas.draw()
         bbox = text.get_window_extent(renderer=renderer)
 
-    dpi = 300
-    if length > 500:
-        dpi = 10
-    elif length > 200:
-        dpi = 30
-    elif length > 100:
-        dpi = 50
-    elif length > 50:
-        dpi = 100
-    elif length > 30:
-        dpi = 150
-
-    fig.savefig("formula.png", bbox_inches='tight', dpi=dpi, transparent=(bgColor == "transparent"))
+    plt.savefig("formula.png", bbox_inches='tight', dpi=300, transparent=(bgColor == "transparent"))
     plt.close()
 
 def latex_to_text(latex: str) -> str:
