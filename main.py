@@ -249,7 +249,7 @@ async def analyze(interaction: discord.Interaction, text: str):
     await interaction.response.defer()
 
     status, payload = run_with_timeout(
-        analyze_text, (text, interaction.response), 10)
+        analyze_text, (text, interaction.followup), 10)
 
     if status == "timeout":
         await interaction.followup.send(TIMEOUT_MSG)
