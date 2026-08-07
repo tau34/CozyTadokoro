@@ -180,7 +180,7 @@ def replace_with_pos(text):
 
     return "".join(result)
 
-def analyze_text(text, response):
+def analyze_text(text, followup):
     str = text.split(" ")
     for i in range(len(str)):
         s = str[i]
@@ -188,7 +188,7 @@ def analyze_text(text, response):
         s1 = [replace_with_pos(x) for x in s1]
         str[i] = "　".join(s1)
 
-    response.send_message(" ".join(str).replace("形状詞助動詞", "形容動詞"))
+    followup.send(" ".join(str).replace("形状詞助動詞", "形容動詞"))
 
 
 def _render_formula_worker(formula, text_color, bg_color, result_queue):
