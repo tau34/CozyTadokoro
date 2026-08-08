@@ -199,6 +199,14 @@ def _render_formula_worker(formula, text_color, bg_color, result_queue):
         result_queue.put(("error", str(exc)))
 
 
+def analyze_text_worker(text, followup, result_queue):
+    try:
+        analyze_text(text, followup)
+        result_queue.put(("ok", None))
+    except Exception as exc:
+        result_queue.put(("error", str(exc)))
+
+
 def run_with_timeout(target, args, timeout_seconds):
     result_queue = multiprocessing.Queue()
     process = multiprocessing.Process(target=target, args=(*args, result_queue))
@@ -249,7 +257,7 @@ async def analyze(interaction: discord.Interaction, text: str):
     await interaction.response.defer()
 
     status, payload = run_with_timeout(
-        analyze_text, (text, interaction.followup), 10)
+        analyze_text_worker, (text, interaction.followup), 10)
 
     if status == "timeout":
         await interaction.followup.send(TIMEOUT_MSG)
