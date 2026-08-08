@@ -185,7 +185,11 @@ def analyze_text(text):
     for i in range(len(parts)):
         s = parts[i]
         s1 = s.split("　")
-        s1 = [replace_with_pos(x) for x in s1]
+        for j in range(len(s1)):
+            s2 = s1[j]
+            s3 = s2.split("\n")
+            s3 = [replace_with_pos(x) for x in s3]
+            s1[j] = "\n".join(s3)
         parts[i] = "　".join(s1)
 
     return " ".join(parts).replace("形状詞助動詞", "形容動詞")
