@@ -333,10 +333,6 @@ async def analyze_message(interaction: discord.Interaction, message: discord.Mes
     if status == "error":
         await interaction.followup.send(f"Error: {payload}")
 
-if __name__ == "__main__":
-    keep_alive()
-    client.run(os.environ["TOKEN"])
-
 @tree.context_menu(name="品詞分解(詳細表示)")
 async def analyze_message_detailed(interaction: discord.Interaction, message: discord.Message):
     content = message.content
