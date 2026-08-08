@@ -181,14 +181,14 @@ def replace_with_pos(text):
     return "".join(result)
 
 def analyze_text(text, followup):
-    str = text.split(" ")
-    for i in range(len(str)):
-        s = str[i]
+    parts = text.split(" ")
+    for i in range(len(parts)):
+        s = parts[i]
         s1 = s.split("　")
         s1 = [replace_with_pos(x) for x in s1]
-        str[i] = "　".join(s1)
+        parts[i] = "　".join(s1)
 
-    followup.send(" ".join(str).replace("形状詞助動詞", "形容動詞"))
+    return " ".join(parts).replace("形状詞助動詞", "形容動詞")
 
 
 def _render_formula_worker(formula, text_color, bg_color, result_queue):
@@ -199,10 +199,9 @@ def _render_formula_worker(formula, text_color, bg_color, result_queue):
         result_queue.put(("error", str(exc)))
 
 
-def analyze_text_worker(text, followup, result_queue):
+def analyze_text_worker(text, result_queue):
     try:
-        analyze_text(text, followup)
-        result_queue.put(("ok", None))
+        result_queue.put(("ok", analyze_text(text, None)))
     except Exception as exc:
         result_queue.put(("error", str(exc)))
 
@@ -257,10 +256,14 @@ async def analyze(interaction: discord.Interaction, text: str):
     await interaction.response.defer()
 
     status, payload = run_with_timeout(
-        analyze_text_worker, (text, interaction.followup), 10)
+        analyze_text_worker, (text), 10)
 
     if status == "timeout":
         await interaction.followup.send(TIMEOUT_MSG)
+        return
+
+    if status == "ok":
+        await interaction.followup.send(payload)
         return
 
     if status == "error":
