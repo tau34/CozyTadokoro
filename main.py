@@ -282,6 +282,10 @@ async def donate_info(interaction: discord.Interaction):
 async def analyze_message(interaction: discord.Interaction, message: discord.Message):
     content = message.content
 
+    if not content:
+        await interaction.response.send_message("このメッセージにはテキストが含まれていません。", ephemeral=True)
+        return
+
     await interaction.response.defer()
 
     status, payload = run_with_timeout(
