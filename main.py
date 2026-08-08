@@ -278,6 +278,26 @@ async def donate_info(interaction: discord.Interaction):
         "https://www.patreon.com/c/tau34\n"
     )
 
+@tree.context_menu(name="メッセージの文章を品詞分解")
+async def analyze_message(interaction: discord.Interaction, message: discord.Message):
+    content = message.content
+
+    await interaction.response.defer()
+
+    status, payload = run_with_timeout(
+        _analyze_text_worker, (content,), 10)
+
+    if status == "timeout":
+        await interaction.followup.send(TIMEOUT_MSG)
+        return
+
+    if status == "ok":
+        await interaction.followup.send(payload)
+        return
+
+    if status == "error":
+        await interaction.followup.send(f"Error: {payload}")
+
 if __name__ == "__main__":
     keep_alive()
     client.run(os.environ["TOKEN"])
