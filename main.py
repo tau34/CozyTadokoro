@@ -180,7 +180,7 @@ def replace_with_pos(text):
 
     return "".join(result)
 
-def analyze_text(text, followup):
+def analyze_text(text):
     parts = text.split(" ")
     for i in range(len(parts)):
         s = parts[i]
@@ -199,9 +199,9 @@ def _render_formula_worker(formula, text_color, bg_color, result_queue):
         result_queue.put(("error", str(exc)))
 
 
-def analyze_text_worker(text, result_queue):
+def _analyze_text_worker(text, result_queue):
     try:
-        result_queue.put(("ok", analyze_text(text, None)))
+        result_queue.put(("ok", analyze_text(text)))
     except Exception as exc:
         result_queue.put(("error", str(exc)))
 
@@ -256,7 +256,7 @@ async def analyze(interaction: discord.Interaction, text: str):
     await interaction.response.defer()
 
     status, payload = run_with_timeout(
-        analyze_text_worker, (text), 10)
+        _analyze_text_worker, (text,), 10)
 
     if status == "timeout":
         await interaction.followup.send(TIMEOUT_MSG)
