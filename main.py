@@ -1,6 +1,7 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+from discord.app_commands import describe
 import multiprocessing
 import matplotlib
 matplotlib.use("Agg")
@@ -154,7 +155,7 @@ def should_keep(surface, features):
 
     return False
 
-def replace_with_pos(text):
+def replace_with_pos(text, detailed):
     result = []
 
     node = mecab.parseToNode(text)
@@ -169,18 +170,37 @@ def replace_with_pos(text):
 
         features = feature.split(",")
 
+        CONNCECT_LIST = ["動詞", "形容詞", "形状詞", "接尾辞"]
         if should_keep(surface, features):
             result.append(surface)
         elif features[0] == "代名詞":
-            result.append("名詞")
-        else:
+            if detailed:
+                result.append("代名詞")
+            else:
+                result.append("名詞")
+        elif (not detailed) or features[1] == "*":
             result.append(features[0])
+        elif features[0] in CONNCECT_LIST:
+            result.append(f"{features[1]}{features[0]}")
+        elif features[0] == "感動詞":
+            if features[1] == "フィラー":
+                result.append("フィラー")
+            else:
+                result.append("一般感動詞")
+        else:
+            result.append(features[1])
+
+        if detailed and features[2] != "*":
+            if detailed and features[3] != "*":
+                result.append(f"({features[2]}、{features[3]})")
+            else:
+                result.append(f"({features[2]})")
 
         node = node.next
 
     return "".join(result)
 
-def analyze_text(text):
+def analyze_text(text, detailed):
     parts = text.split(" ")
     for i in range(len(parts)):
         s = parts[i]
@@ -188,11 +208,11 @@ def analyze_text(text):
         for j in range(len(s1)):
             s2 = s1[j]
             s3 = s2.split("\n")
-            s3 = [replace_with_pos(x) for x in s3]
+            s3 = [replace_with_pos(x, detailed) for x in s3]
             s1[j] = "\n".join(s3)
         parts[i] = "　".join(s1)
 
-    return " ".join(parts).replace("形状詞助動詞", "形容動詞")
+    return " ".join(parts).replace("形状詞助動詞", "形容動詞").replace("形状詞可能", "形容動詞可能")
 
 
 def _render_formula_worker(formula, text_color, bg_color, result_queue):
@@ -203,9 +223,9 @@ def _render_formula_worker(formula, text_color, bg_color, result_queue):
         result_queue.put(("error", str(exc)))
 
 
-def _analyze_text_worker(text, result_queue):
+def _analyze_text_worker(text, detailed, result_queue):
     try:
-        result_queue.put(("ok", analyze_text(text)))
+        result_queue.put(("ok", analyze_text(text, detailed)))
     except Exception as exc:
         result_queue.put(("error", str(exc)))
 
@@ -228,6 +248,11 @@ def run_with_timeout(target, args, timeout_seconds):
         return ("error", "結果を取得できませんでした")
 
 @tree.command(name="tex", description="数式を画像で表示")
+@describe(
+    formula="数式のTeXコード",
+    text_color="文字色",
+    bg_color="背景色"
+)
 async def tex(interaction: discord.Interaction,
                 formula: str, text_color: str = "black", bg_color: str = "white"):
     await interaction.response.defer()
@@ -248,6 +273,7 @@ async def tex(interaction: discord.Interaction,
         await interaction.followup.send(f"Error: {payload}")
 
 @tree.command(name="tex-text", description="数式をテキスト表示")
+@describe(formula="数式のTeXコード")
 async def tex_text(interaction: discord.Interaction, formula: str):
     try:
         await interaction.response.send_message(latex_to_text(formula))
@@ -256,11 +282,12 @@ async def tex_text(interaction: discord.Interaction, formula: str):
         await interaction.response.send_message(f"Error: {e}")
 
 @tree.command(name="analyze", description="日本語の文章を品詞分解")
-async def analyze(interaction: discord.Interaction, text: str):
+@describe(text="品詞分解する文章", detailed="詳細表示するか否か。する:True、しない(デフォルト):False")
+async def analyze(interaction: discord.Interaction, text: str, detailed: bool = False):
     await interaction.response.defer()
 
     status, payload = run_with_timeout(
-        _analyze_text_worker, (text,), 10)
+        _analyze_text_worker, (text, detailed), 10)
 
     if status == "timeout":
         await interaction.followup.send(TIMEOUT_MSG)
@@ -282,7 +309,7 @@ async def donate_info(interaction: discord.Interaction):
         "https://www.patreon.com/c/tau34\n"
     )
 
-@tree.context_menu(name="メッセージの文章を品詞分解")
+@tree.context_menu(name="品詞分解")
 async def analyze_message(interaction: discord.Interaction, message: discord.Message):
     content = message.content
 
@@ -293,7 +320,35 @@ async def analyze_message(interaction: discord.Interaction, message: discord.Mes
     await interaction.response.defer()
 
     status, payload = run_with_timeout(
-        _analyze_text_worker, (content,), 10)
+        _analyze_text_worker, (content, False), 10)
+
+    if status == "timeout":
+        await interaction.followup.send(TIMEOUT_MSG)
+        return
+
+    if status == "ok":
+        await interaction.followup.send(payload)
+        return
+
+    if status == "error":
+        await interaction.followup.send(f"Error: {payload}")
+
+if __name__ == "__main__":
+    keep_alive()
+    client.run(os.environ["TOKEN"])
+
+@tree.context_menu(name="品詞分解(詳細表示)")
+async def analyze_message_detailed(interaction: discord.Interaction, message: discord.Message):
+    content = message.content
+
+    if not content:
+        await interaction.response.send_message("このメッセージにはテキストが含まれていません。", ephemeral=True)
+        return
+
+    await interaction.response.defer()
+
+    status, payload = run_with_timeout(
+        _analyze_text_worker, (content, True), 10)
 
     if status == "timeout":
         await interaction.followup.send(TIMEOUT_MSG)
